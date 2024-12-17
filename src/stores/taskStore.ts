@@ -7,6 +7,8 @@ export const useTaskStore = defineStore('tasks', () => {
   const tasks = ref<Task[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
+  const loadingMessage = ref<string>('')
+  const deletingTaskIds = ref<Set<string>>(new Set())
 
   async function fetchTasks() {
     try {
@@ -81,7 +83,10 @@ export const useTaskStore = defineStore('tasks', () => {
 
   async function deleteTask(id: string) {
     try {
+      deletingTaskIds.value.add(id)
+      loadingMessage.value = 'Deleting task...'
       loading.value = true
+
       const { error: err } = await supabase.from('tasks').delete().eq('id', id)
 
       if (err) throw err
@@ -89,7 +94,9 @@ export const useTaskStore = defineStore('tasks', () => {
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Unknown error occurred'
     } finally {
+      deletingTaskIds.value.delete(id)
       loading.value = false
+      loadingMessage.value = ''
     }
   }
 
@@ -101,5 +108,7 @@ export const useTaskStore = defineStore('tasks', () => {
     addTask,
     updateTask,
     deleteTask,
+    loadingMessage,
+    deletingTaskIds,
   }
 })

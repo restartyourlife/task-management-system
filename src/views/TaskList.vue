@@ -1,12 +1,28 @@
 <script setup lang="ts">
 import { useTaskStore } from '@/stores/taskStore'
 import { RouterLink } from 'vue-router'
+import { onMounted } from 'vue'
+import LoadingOverlay from '@/components/LoadingOverlay.vue'
 
 const taskStore = useTaskStore()
+
+onMounted(() => {
+  taskStore.fetchTasks()
+})
 </script>
 
 <template>
   <div class="task-list">
+    <LoadingOverlay :show="taskStore.loading">
+      <template v-if="taskStore.loading">
+        {{ taskStore.loadingMessage || 'Loading tasks...' }}
+      </template>
+    </LoadingOverlay>
+
+    <div v-if="taskStore.error" class="error-message">
+      {{ taskStore.error }}
+    </div>
+
     <div class="header">
       <h1>Tasks</h1>
       <RouterLink to="/tasks/create" class="create-button">
@@ -19,7 +35,12 @@ const taskStore = useTaskStore()
 
     <div class="tasks">
       <TransitionGroup name="task-list">
-        <div v-for="task in taskStore.tasks" :key="task.id" class="task-card" :class="task.status">
+        <div
+          v-for="task in taskStore.tasks"
+          :key="task.id"
+          class="task-card"
+          :class="[task.status, { deleting: taskStore.deletingTaskIds.has(task.id) }]"
+        >
           <h3>{{ task.title }}</h3>
           <p>{{ task.description }}</p>
           <div class="task-meta">
@@ -30,8 +51,15 @@ const taskStore = useTaskStore()
             <RouterLink :to="`/tasks/${task.id}/edit`" class="edit-button">
               <span class="button-content">Edit</span>
             </RouterLink>
-            <button @click="taskStore.deleteTask(task.id)" class="delete-button">
-              <span class="button-content">Delete</span>
+            <button
+              @click="taskStore.deleteTask(task.id)"
+              class="delete-button"
+              :disabled="taskStore.deletingTaskIds.has(task.id)"
+            >
+              <span class="button-content">
+                <span v-if="taskStore.deletingTaskIds.has(task.id)" class="loading-spinner"></span>
+                <span v-else>Delete</span>
+              </span>
             </button>
           </div>
         </div>
@@ -277,5 +305,42 @@ h1 {
   .task-meta {
     flex-wrap: wrap;
   }
+}
+
+.error-message {
+  padding: 1rem;
+  margin: 1rem 0;
+  background: var(--danger-color);
+  color: white;
+  border-radius: var(--radius);
+  animation: shake 0.5s ease-in-out;
+}
+
+.task-card.deleting {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-10px);
+  }
+  75% {
+    transform: translateX(10px);
+  }
+}
+
+.loading-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spin 0.6s linear infinite;
 }
 </style>
