@@ -14,7 +14,9 @@ export const useAuthStore = defineStore('auth', () => {
       const { error: err } = await supabase.auth.signInWithOAuth({
         provider: 'github',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: import.meta.env.PROD
+            ? 'https://restartyourlife.github.io/task-management-system'
+            : 'http://localhost:5173',
         },
       })
       if (err) throw err
@@ -38,7 +40,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // Инициализация по��ьзователя
+  // Инициализация пользователя
   async function init() {
     const {
       data: { user: currentUser },

@@ -29,6 +29,12 @@ const router = createRouter({
       name: 'login',
       component: LoginPage,
     },
+    {
+      path: '/auth/callback',
+      name: 'auth-callback',
+      component: TaskList,
+      meta: { requiresAuth: true },
+    },
   ],
 })
 
