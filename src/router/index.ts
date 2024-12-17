@@ -5,6 +5,11 @@ import TaskEdit from '@/views/TaskEdit.vue'
 import { supabase } from '@/config/supabase'
 import LoginPage from '@/views/LoginPage.vue'
 
+const getInitialPath = () => {
+  const query = new URLSearchParams(window.location.search)
+  return query.get('path') || '/'
+}
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -48,5 +53,9 @@ router.beforeEach(async (to) => {
     return { name: 'login' }
   }
 })
+
+if (window.location.search.includes('path=')) {
+  router.push(getInitialPath())
+}
 
 export default router
