@@ -5,7 +5,8 @@
     <title>Task Management System</title>
     <script>
       const path = window.location.pathname
-      const redirectURL = `/?path=${path}`
+      const basePath = '/task-management-system'
+      const redirectURL = `${basePath}/?path=${path.replace(basePath, '')}`
       window.location.replace(redirectURL)
     </script>
   </head>

@@ -7,7 +7,8 @@ import LoginPage from '@/views/LoginPage.vue'
 
 const getInitialPath = () => {
   const query = new URLSearchParams(window.location.search)
-  return query.get('path') || '/'
+  const path = query.get('path')
+  return path ? path.replace('/task-management-system', '') : '/'
 }
 
 const router = createRouter({
