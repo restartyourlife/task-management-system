@@ -28,6 +28,12 @@ export const useTaskStore = defineStore('tasks', () => {
   async function addTask(task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) {
     try {
       loading.value = true
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) throw new Error('User not authenticated')
+
       const { data, error: err } = await supabase
         .from('tasks')
         .insert([
@@ -36,6 +42,7 @@ export const useTaskStore = defineStore('tasks', () => {
             description: task.description,
             status: task.status,
             priority: task.priority,
+            user_id: user.id,
           },
         ])
         .select()
