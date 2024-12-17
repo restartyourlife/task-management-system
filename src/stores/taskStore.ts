@@ -1,34 +1,98 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { Task } from '@/types/task'
+import { supabase } from '@/config/supabase'
 
 export const useTaskStore = defineStore('tasks', () => {
   const tasks = ref<Task[]>([])
+  const loading = ref(false)
+  const error = ref<string | null>(null)
 
-  function addTask(task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) {
-    const newTask: Task = {
-      id: crypto.randomUUID(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      ...task,
+  async function fetchTasks() {
+    try {
+      loading.value = true
+      const { data, error: err } = await supabase
+        .from('tasks')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (err) throw err
+      tasks.value = data
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Unknown error occurred'
+    } finally {
+      loading.value = false
     }
-    tasks.value.push(newTask)
   }
 
-  function updateTask(id: string, updates: Partial<Task>) {
-    const taskIndex = tasks.value.findIndex((task) => task.id === id)
-    if (taskIndex !== -1) {
-      tasks.value[taskIndex] = {
-        ...tasks.value[taskIndex],
-        ...updates,
-        updatedAt: new Date(),
+  async function addTask(task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) {
+    try {
+      loading.value = true
+      const { data, error: err } = await supabase
+        .from('tasks')
+        .insert([
+          {
+            title: task.title,
+            description: task.description,
+            status: task.status,
+            priority: task.priority,
+          },
+        ])
+        .select()
+        .single()
+
+      if (err) throw err
+      if (data) tasks.value.unshift(data)
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Unknown error occurred'
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function updateTask(id: string, updates: Partial<Task>) {
+    try {
+      loading.value = true
+      const { data, error: err } = await supabase
+        .from('tasks')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (err) throw err
+      if (data) {
+        const index = tasks.value.findIndex((t) => t.id === id)
+        if (index !== -1) tasks.value[index] = data
       }
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Unknown error occurred'
+    } finally {
+      loading.value = false
     }
   }
 
-  function deleteTask(id: string) {
-    tasks.value = tasks.value.filter((task) => task.id !== id)
+  async function deleteTask(id: string) {
+    try {
+      loading.value = true
+      const { error: err } = await supabase.from('tasks').delete().eq('id', id)
+
+      if (err) throw err
+      tasks.value = tasks.value.filter((task) => task.id !== id)
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Unknown error occurred'
+    } finally {
+      loading.value = false
+    }
   }
 
-  return { tasks, addTask, updateTask, deleteTask }
+  return {
+    tasks,
+    loading,
+    error,
+    fetchTasks,
+    addTask,
+    updateTask,
+    deleteTask,
+  }
 })
