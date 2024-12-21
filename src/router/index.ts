@@ -6,12 +6,6 @@ import TaskEdit from '@/views/TaskEdit.vue'
 import { supabase } from '@/config/supabase'
 import LoginPage from '@/views/LoginPage.vue'
 
-const getInitialPath = () => {
-  const query = new URLSearchParams(window.location.search)
-  const path = query.get('path')
-  return path ? path.replace('/task-management-system', '') : '/'
-}
-
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -42,26 +36,58 @@ const router = createRouter({
       component: TaskList,
       meta: { requiresAuth: false },
     },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'not-found',
+      redirect: () => {
+        return { name: 'login' }
+      }
+    }
   ],
 })
 
 // Защита роутов
 router.beforeEach(async (to: RouteLocationNormalized) => {
-  if (to.path === '/auth/callback') {
-    return true
-  }
+  try {
+    // Проверяем callback
+    if (to.path === '/auth/callback') {
+      const {
+        data: { session },
+        error: authError
+      } = await supabase.auth.getSession()
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+      if (authError) {
+        throw new Error('Authentication failed: ' + authError.message)
+      }
 
-  if (to.meta.requiresAuth && !session) {
-    return { name: 'login' }
+      if (session) {
+        return { name: 'tasks' }
+      }
+      throw new Error('No session after authentication')
+    }
+
+    // Проверяем авторизацию для защищенных маршрутов
+    const {
+      data: { session },
+      error: authError
+    } = await supabase.auth.getSession()
+
+    if (authError) {
+      throw new Error('Session check failed: ' + authError.message)
+    }
+
+    if (to.meta.requiresAuth && !session) {
+      return { name: 'login', query: { error: 'Authentication required' } }
+    }
+  } catch (error) {
+    console.error('Navigation error:', error)
+    return {
+      name: 'login',
+      query: {
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      }
+    }
   }
 })
-
-if (window.location.search.includes('path=')) {
-  router.push(getInitialPath())
-}
 
 export default router

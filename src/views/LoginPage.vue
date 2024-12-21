@@ -1,17 +1,27 @@
 <script setup lang="ts">
 import { useAuthStore } from '@/stores/authStore'
-import { useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
+import { ref, onMounted } from 'vue'
 
 const authStore = useAuthStore()
-const router = useRouter()
+const route = useRoute()
+const error = ref<string | null>(null)
+
+onMounted(() => {
+  // Получаем ошибку из query параметров
+  if (route.query.error) {
+    error.value = route.query.error as string
+  }
+})
 
 const handleSignIn = async () => {
   try {
+    error.value = null
     await authStore.signInWithGitHub()
-    // Переходим на страницу задач после успешной авторизации
-    await router.push({ name: 'tasks' })
-  } catch (error) {
-    console.error('Ошибка авторизации:', error)
+  } catch (e) {
+    error.value = e instanceof Error
+      ? e.message
+      : 'Произошла ошибка при авторизации'
   }
 }
 </script>
@@ -19,6 +29,9 @@ const handleSignIn = async () => {
 <template>
   <div class="login-page">
     <h1>Welcome to Task Management</h1>
+    <div v-if="error" class="error-message">
+      {{ error }}
+    </div>
     <button @click="handleSignIn" :disabled="authStore.loading">
       <span v-if="authStore.loading">Loading...</span>
       <span v-else>
@@ -61,5 +74,14 @@ button:hover {
 button:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+}
+
+.error-message {
+  color: var(--danger-color);
+  background: rgba(231, 76, 60, 0.1);
+  padding: 1rem;
+  border-radius: var(--radius);
+  margin-bottom: 1rem;
+  text-align: center;
 }
 </style>
