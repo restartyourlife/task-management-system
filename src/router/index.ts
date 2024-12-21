@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import type { RouteLocationNormalized } from 'vue-router'
 import TaskList from '@/views/TaskList.vue'
 import TaskCreate from '@/views/TaskCreate.vue'
 import TaskEdit from '@/views/TaskEdit.vue'
@@ -39,13 +40,17 @@ const router = createRouter({
       path: '/auth/callback',
       name: 'auth-callback',
       component: TaskList,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: false },
     },
   ],
 })
 
 // Защита роутов
-router.beforeEach(async (to) => {
+router.beforeEach(async (to: RouteLocationNormalized) => {
+  if (to.path === '/auth/callback') {
+    return true
+  }
+
   const {
     data: { session },
   } = await supabase.auth.getSession()

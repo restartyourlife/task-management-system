@@ -1,13 +1,25 @@
 <script setup lang="ts">
 import { useAuthStore } from '@/stores/authStore'
+import { useRouter } from 'vue-router'
 
 const authStore = useAuthStore()
+const router = useRouter()
+
+const handleSignIn = async () => {
+  try {
+    await authStore.signInWithGitHub()
+    // Переходим на страницу задач после успешной авторизации
+    await router.push({ name: 'tasks' })
+  } catch (error) {
+    console.error('Ошибка авторизации:', error)
+  }
+}
 </script>
 
 <template>
   <div class="login-page">
     <h1>Welcome to Task Management</h1>
-    <button @click="authStore.signInWithGitHub" :disabled="authStore.loading">
+    <button @click="handleSignIn" :disabled="authStore.loading">
       <span v-if="authStore.loading">Loading...</span>
       <span v-else>
         <i class="fab fa-github"></i>
