@@ -7,7 +7,7 @@ import { supabase } from '@/config/supabase'
 import LoginPage from '@/views/LoginPage.vue'
 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: createWebHistory('/task-management-system/'),
   routes: [
     {
       path: '/',
@@ -49,6 +49,24 @@ const router = createRouter({
 // Защита роутов
 router.beforeEach(async (to: RouteLocationNormalized) => {
   try {
+    // Проверяем hash на наличие access_token
+    const hash = window.location.hash;
+    if (hash && hash.includes('access_token')) {
+      // Обрабатываем callback от GitHub
+      const {
+        data: { session },
+        error: authError
+      } = await supabase.auth.getSession()
+
+      if (authError) {
+        throw new Error('Authentication failed: ' + authError.message)
+      }
+
+      if (session) {
+        return { name: 'tasks' }
+      }
+    }
+
     // Проверяем callback
     if (to.path === '/auth/callback') {
       const {

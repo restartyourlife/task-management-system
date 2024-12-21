@@ -15,7 +15,7 @@ export const useAuthStore = defineStore('auth', () => {
         provider: 'github',
         options: {
           redirectTo: import.meta.env.PROD
-            ? 'https://restartyourlife.github.io/task-management-system/auth/callback'
+            ? 'https://restartyourlife.github.io/task-management-system/'
             : 'http://localhost:5173/auth/callback',
         },
       })
