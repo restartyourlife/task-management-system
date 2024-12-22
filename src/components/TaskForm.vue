@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import type { Task } from '@/types/task'
+import CustomSelect from './CustomSelect.vue'
 
 const props = defineProps<{
   initialTask?: Partial<Task>
@@ -18,6 +19,10 @@ const priority = ref(props.initialTask?.priority ?? 'medium')
 const tags = ref<string[]>(props.initialTask?.tags ?? [])
 const newTag = ref('')
 
+const MAX_DESCRIPTION_LENGTH = 1000
+
+const isDescriptionTooLong = computed(() => description.value.length > MAX_DESCRIPTION_LENGTH)
+
 function addTag() {
   const tag = newTag.value.trim()
   if (tag && !tags.value.includes(tag)) {
@@ -31,9 +36,11 @@ function removeTag(tagToRemove: string) {
 }
 
 function handleSubmit() {
+  if (isDescriptionTooLong.value) return
+
   emit('submit', {
     title: title.value,
-    description: description.value,
+    description: description.value.slice(0, MAX_DESCRIPTION_LENGTH),
     status: status.value as Task['status'],
     priority: priority.value as Task['priority'],
     tags: tags.value
@@ -81,12 +88,13 @@ function handleTagKeydown(event: KeyboardEvent) {
         required
         placeholder="Enter task description"
         :disabled="disabled"
+        :maxlength="MAX_DESCRIPTION_LENGTH"
         class="form-control"
       ></textarea>
       <div class="description-footer">
         <span class="hint">Supports markdown</span>
         <span class="char-count" :class="{ 'near-limit': description.length > 900 }">
-          {{ description.length }}/1000
+          {{ description.length }}/{{ MAX_DESCRIPTION_LENGTH }}
         </span>
       </div>
     </div>
@@ -97,11 +105,14 @@ function handleTagKeydown(event: KeyboardEvent) {
           <i class="fas fa-tasks"></i>
           Status
         </label>
-        <select id="status" v-model="status" :disabled="disabled" class="form-control">
-          <option value="todo">To Do</option>
-          <option value="in-progress">In Progress</option>
-          <option value="done">Done</option>
-        </select>
+        <CustomSelect
+          v-model="status"
+          :options="[
+            { value: 'todo', label: 'To Do' },
+            { value: 'in-progress', label: 'In Progress' },
+            { value: 'done', label: 'Done' }
+          ]"
+        />
       </div>
 
       <div class="form-group">
@@ -109,11 +120,14 @@ function handleTagKeydown(event: KeyboardEvent) {
           <i class="fas fa-flag"></i>
           Priority
         </label>
-        <select id="priority" v-model="priority" :disabled="disabled" class="form-control">
-          <option value="low">Low</option>
-          <option value="medium">Medium</option>
-          <option value="high">High</option>
-        </select>
+        <CustomSelect
+          v-model="priority"
+          :options="[
+            { value: 'low', label: 'Low' },
+            { value: 'medium', label: 'Medium' },
+            { value: 'high', label: 'High' }
+          ]"
+        />
       </div>
     </div>
 
@@ -325,5 +339,24 @@ select.form-control {
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
   background: var(--bg-color);
+}
+
+.char-count {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.char-count.near-limit {
+  color: var(--danger-color);
+  font-weight: 500;
+}
+
+.description-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: #666;
 }
 </style>

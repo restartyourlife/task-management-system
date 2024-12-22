@@ -29,7 +29,7 @@ async function loadComments() {
         )
       `)
       .eq('task_id', props.taskId)
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: true })
 
     if (error) throw error
 
@@ -88,13 +88,7 @@ async function addComment() {
       .single()
 
     if (error) throw error
-    comments.value.unshift({
-      ...data,
-      userMetadata: {
-        fullName: data.author?.full_name,
-        avatarUrl: data.author?.avatar_url
-      }
-    })
+    comments.value.push(data)
     newComment.value = ''
   } catch (error) {
     console.error('Error adding comment:', error)
@@ -353,6 +347,7 @@ textarea:focus {
   flex-direction: column;
   gap: 1rem;
   width: 100%;
+  margin-bottom: 1rem;
 }
 
 .loading,

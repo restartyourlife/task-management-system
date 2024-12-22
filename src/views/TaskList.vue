@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useTaskStore } from '@/stores/taskStore'
 import { RouterLink } from 'vue-router'
-import { onMounted, ref, onUnmounted } from 'vue'
+import { onMounted, ref, onUnmounted, reactive } from 'vue'
 import LoadingOverlay from '@/components/LoadingOverlay.vue'
 import TaskFilters from '@/components/TaskFilters.vue'
 import TaskSort from '@/components/TaskSort.vue'
@@ -9,6 +9,7 @@ import TaskComments from '@/components/TaskComments.vue'
 
 const taskStore = useTaskStore()
 const activeCommentTaskId = ref<string | null>(null)
+const expandedDescriptions = reactive<Record<string, boolean>>({})
 
 onMounted(() => {
   taskStore.fetchTasks()
@@ -22,6 +23,10 @@ function toggleComments(taskId: string) {
     activeCommentTaskId.value = taskId
     document.body.classList.add('modal-open')
   }
+}
+
+function toggleDescription(taskId: string) {
+  expandedDescriptions[taskId] = !expandedDescriptions[taskId]
 }
 
 onUnmounted(() => {
@@ -41,160 +46,161 @@ onUnmounted(() => {
       {{ taskStore.error }}
     </div>
 
-    <div class="header">
-      <h1>Tasks</h1>
-      <RouterLink to="/tasks/create" class="create-button">
-        <span class="button-content">
-          <span class="plus-icon">+</span>
-          Create Task
-        </span>
-      </RouterLink>
+    <div class="list-container">
+      <TaskFilters class="filters-panel" />
+      <div class="tasks-content">
+        <TaskSort />
+        <div class="tasks-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Status</th>
+                <th>Priority</th>
+                <th>Tags</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="task in taskStore.filteredTasks"
+                :key="task.id"
+                :class="{ deleting: taskStore.deletingTaskIds.has(task.id) }"
+              >
+                <td class="title-cell">
+                  <h3>{{ task.title }}</h3>
+                  <button
+                    v-if="task.description"
+                    class="show-description-btn"
+                    @click="toggleDescription(task.id)"
+                  >
+                    <i class="fas fa-align-left"></i>
+                    Description
+                  </button>
+                  <div
+                    v-if="expandedDescriptions[task.id]"
+                    class="description-popup"
+                  >
+                    <p>{{ task.description }}</p>
+                  </div>
+                </td>
+                <td>
+                  <span class="status" :class="task.status">{{ task.status }}</span>
+                </td>
+                <td>
+                  <span class="priority" :class="task.priority">{{ task.priority }}</span>
+                </td>
+                <td>
+                  <div class="tags-list" v-if="task.tags?.length">
+                    <span v-for="tag in task.tags" :key="tag" class="tag">{{ tag }}</span>
+                  </div>
+                </td>
+                <td class="actions-cell">
+                  <RouterLink :to="`/tasks/${task.id}/edit`" class="edit-button">
+                    <i class="fas fa-edit"></i>
+                  </RouterLink>
+                  <button
+                    @click="taskStore.deleteTask(task.id)"
+                    class="delete-button"
+                    :disabled="taskStore.deletingTaskIds.has(task.id)"
+                  >
+                    <i class="fas fa-trash"></i>
+                  </button>
+                  <button
+                    @click.stop="toggleComments(task.id)"
+                    class="comments-button"
+                    :class="{ active: activeCommentTaskId === task.id }"
+                  >
+                    <i class="fas fa-comments"></i>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
-    <TaskFilters />
-    <TaskSort />
-
-    <div class="tasks-container">
-      <TransitionGroup name="task-list" tag="div" class="tasks-grid">
-        <div
-          v-for="task in taskStore.filteredTasks"
-          :key="task.id"
-          class="task-card"
-          :class="[task.status, { deleting: taskStore.deletingTaskIds.has(task.id) }]"
-        >
-          <div class="task-content">
-            <div class="task-header">
-              <h3>{{ task.title }}</h3>
-              <div class="task-meta">
-                <span class="status" :class="task.status">{{ task.status }}</span>
-                <span class="priority" :class="task.priority">{{ task.priority }}</span>
-              </div>
-              <div class="tags" v-if="task.tags?.length">
-                <span v-for="tag in task.tags" :key="tag" class="tag">{{ tag }}</span>
-              </div>
-            </div>
-            <p>{{ task.description }}</p>
-            <div class="actions">
-              <RouterLink :to="`/tasks/${task.id}/edit`" class="edit-button">
-                <span class="button-content">Edit</span>
-              </RouterLink>
-              <button
-                @click="taskStore.deleteTask(task.id)"
-                class="delete-button"
-                :disabled="taskStore.deletingTaskIds.has(task.id)"
-              >
-                <span class="button-content">
-                  <span v-if="taskStore.deletingTaskIds.has(task.id)" class="loading-spinner"></span>
-                  <span v-else>Delete</span>
-                </span>
-              </button>
-              <button
-                @click.stop="toggleComments(task.id)"
-                class="comments-button"
-                :class="{ active: activeCommentTaskId === task.id }"
-              >
-                <i class="fas fa-comments"></i>
-                Comments
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="activeCommentTaskId" class="modal-wrapper">
+          <div class="modal-overlay" @click="activeCommentTaskId = null"></div>
+          <div class="modal-container">
+            <div class="modal-header">
+              <h3>Comments</h3>
+              <button class="close-button" @click="activeCommentTaskId = null">
+                <i class="fas fa-times"></i>
               </button>
             </div>
-          </div>
-
-          <div
-            v-if="activeCommentTaskId === task.id"
-            class="comments-overlay"
-            @click.self="activeCommentTaskId = null"
-          >
-            <div class="comments-modal">
-              <div class="modal-header">
-                <button class="close-button" @click="activeCommentTaskId = null">
-                  <i class="fas fa-times"></i>
-                </button>
-              </div>
-              <TaskComments :task-id="task.id" />
+            <div class="modal-content">
+              <TaskComments :task-id="activeCommentTaskId" />
             </div>
           </div>
         </div>
-      </TransitionGroup>
-    </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
 <style scoped>
 .task-list {
-  padding: 2rem;
-  animation: fadeIn 0.5s ease;
   height: calc(100vh - var(--header-height));
-  overflow-y: auto;
-}
-
-.header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
-  position: sticky;
-  top: 0;
-  background: var(--bg-color);
-  z-index: 2;
-  padding-bottom: 1rem;
-  margin-bottom: 1rem;
-}
-
-h1 {
-  font-size: 2rem;
-  color: var(--text-color);
-  margin: 0;
-}
-
-.create-button {
-  background-color: var(--success-color);
-  color: white;
-  padding: 0.75rem 1.5rem;
-  text-decoration: none;
-  border-radius: var(--radius);
-  font-weight: 500;
-  transition: background-color 0.2s;
-  position: relative;
+  flex-direction: column;
   overflow: hidden;
 }
 
-.create-button:hover {
-  background-color: #27ae60;
+.fixed-content {
+  position: sticky;
+  top: 0;
+  background: var(--bg-color);
+  z-index: 40;
+  padding: 2rem 2rem 0;
 }
 
-.create-button::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  transition:
-    width 0.3s,
-    height 0.3s;
+.header {
+  margin-bottom: 1rem;
+  z-index: 30;
+  backdrop-filter: blur(8px);
 }
 
-.create-button:hover::after {
-  width: 300px;
-  height: 300px;
+:deep(.task-filters) {
+  margin-bottom: 1rem;
+  z-index: 20;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+:deep(.task-sort) {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  z-index: 15;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.scrollable-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 2rem 2rem;
 }
 
 .tasks-container {
   width: 100%;
   border-top: 1px solid var(--border-color);
   padding-top: 1.5rem;
-  margin-top: 1rem;
+  position: relative;
+  z-index: 1;
 }
 
 .tasks-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 1.5rem;
-  position: relative;
-  z-index: 1;
 }
 
 .task-card {
@@ -203,14 +209,15 @@ h1 {
   border: 1px solid var(--border-color);
   transition: all var(--transition-normal);
   position: relative;
+  height: fit-content; /* Важно для одинаковой высоты */
 }
 
 .task-content {
   padding: 2rem;
-  height: 100%;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  height: auto; /* Изменено с 100% */
 }
 
 .task-comments-wrapper {
@@ -262,6 +269,11 @@ h1 {
   line-height: 1.6;
   font-size: 0.95rem;
   padding: 0.5rem 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
 }
 
 .task-meta {
@@ -516,7 +528,7 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 50;
   padding: 2rem;
   overflow: hidden;
 }
@@ -592,63 +604,418 @@ h1 {
   padding-right: 15px;
 }
 
-:deep(.task-filters),
-:deep(.task-sort) {
-  position: sticky;
-  background: var(--bg-color);
-  z-index: 10;
+@media (max-width: 768px) {
+  .fixed-content {
+    padding: 1rem 1rem 0;
+  }
+
+  .scrollable-content {
+    padding: 0 1rem 1rem;
+  }
 }
 
-.header,
-:deep(.task-filters),
-:deep(.task-sort) {
-  position: sticky;
-  background: var(--bg-color);
-  z-index: 10;
+.create-button {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  background-color: var(--success-color);
+  color: white;
+  padding: 1rem;
+  border-radius: 50%;
+  text-decoration: none;
+  box-shadow: var(--shadow-lg);
+  transition: all var(--transition-normal);
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
 }
 
-.header {
-  top: 0;
-  padding-bottom: 1rem;
-  margin-bottom: 1rem;
-  z-index: 30;
+.create-button:hover {
+  transform: translateY(-2px);
+  background-color: #27ae60;
 }
 
-:deep(.task-filters) {
-  top: calc(var(--header-height) + 1rem);
-  margin-bottom: 1rem;
-  box-shadow: var(--shadow-sm);
-  z-index: 20;
-  background: white;
-  border: 1px solid var(--border-color);
+.create-button .button-content {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.create-button i {
+  font-size: 1.5rem;
+}
+
+.create-button .button-text {
+  display: none;
+}
+
+.create-button:hover::before {
+  content: 'Create Task';
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 0.5rem 1rem;
   border-radius: var(--radius);
+  margin-right: 1rem;
+  font-size: 0.9rem;
+  white-space: nowrap;
 }
 
-:deep(.task-sort) {
-  top: calc(var(--header-height) + 180px);
-  margin-bottom: 1rem;
+@media (max-width: 768px) {
+  .create-button {
+    bottom: 1.5rem;
+    right: 1.5rem;
+    width: 50px;
+    height: 50px;
+  }
+
+  .create-button i {
+    font-size: 1.25rem;
+  }
+}
+
+/* Стили для модального окна */
+.modal-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100; /* Выше всего */
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+.modal-container {
+  position: relative;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  background: white;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  z-index: 101; /* Выше оверлея */
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--text-color);
+}
+
+.close-button {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  color: #666;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.close-button:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: var(--danger-color);
+}
+
+.modal-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+}
+
+/* Анимации для модального окна */
+.modal-enter-active,
+.modal-leave-active {
+  transition: all 0.3s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+
+.modal-enter-from .modal-container {
+  transform: translateY(20px);
+}
+
+.modal-leave-to .modal-container {
+  transform: translateY(-20px);
+}
+
+/* Обновленные z-index'ы */
+.fixed-content {
+  z-index: 40;
+}
+
+.create-button {
+  z-index: 45;
+}
+
+/* Медиа-запросы */
+@media (max-width: 768px) {
+  .modal-container {
+    width: 95%;
+    max-height: 95vh;
+  }
+
+  .modal-header {
+    padding: 1rem;
+  }
+
+  .modal-content {
+    padding: 1rem;
+  }
+}
+
+.list-container {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 2rem;
+  padding: 2rem;
+}
+
+.filters-panel {
+  position: sticky;
+  top: calc(var(--header-height) + 2rem);
+  height: calc(100vh - var(--header-height) - 4rem);
+}
+
+.tasks-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+  .list-container {
+    grid-template-columns: 1fr;
+    padding: 1rem;
+  }
+
+  .filters-panel {
+    position: static;
+    height: auto;
+  }
+}
+
+.description-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  position: relative; /* Для позиционирования кнопки */
+}
+
+.description {
+  margin: 0;
+  color: #4a5568;
+  line-height: 1.7;
+  font-size: 0.95rem;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  overflow: hidden;
+  word-wrap: break-word;
+  white-space: pre-line;
+  max-width: 100%;
+  transition: all 0.3s ease;
+}
+
+.description:not(.is-expanded) {
+  display: block; /* Убираем -webkit-box */
+  max-height: 4.8em; /* Примерно 3 строки */
+  overflow: hidden;
+}
+
+.show-more-btn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  color: var(--primary-color);
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 0.25rem;
+}
+
+.show-more-btn:hover {
+  background: var(--primary-color);
+  color: white;
+}
+
+.show-more-btn i {
+  font-size: 0.75rem;
+}
+
+@media (max-width: 768px) {
+  .description {
+    font-size: 0.9rem;
+    line-height: 1.6;
+  }
+
+  .show-more-btn {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.8rem;
+  }
+}
+
+.tasks-table {
+  background: white;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+  width: 100%;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 1rem;
+  text-align: left;
+}
+
+/* Горизонтальные линии */
+tr {
+  border-bottom: 1px solid var(--border-color);
+}
+
+tr:last-child {
+  border-bottom: none;
+}
+
+/* Вертикальные линии */
+td, th {
+  border-right: 1px solid var(--border-color);
+}
+
+td:last-child, th:last-child {
+  border-right: none;
+}
+
+th {
+  background: #f8fafc;
+  font-weight: 500;
+  color: #64748b;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.title-cell {
+  position: relative;
+  min-width: 250px;
+}
+
+.title-cell h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text-color);
+}
+
+.show-description-btn {
+  margin-top: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+  color: #64748b;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.show-description-btn:hover {
+  background: var(--bg-color);
+  color: var(--primary-color);
+}
+
+.description-popup {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 300px;
   padding: 1rem;
   background: white;
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
+  box-shadow: var(--shadow);
   z-index: 10;
+  margin-top: 0.5rem;
 }
 
-@media (max-width: 768px) {
-  .task-list {
-    padding: 1rem;
-  }
-
-  .tasks-container {
-    padding-top: 1rem;
-  }
-
-  :deep(.task-filters) {
-    top: calc(var(--header-height) + 0.5rem);
-  }
-
-  :deep(.task-sort) {
-    top: calc(var(--header-height) + 150px);
-  }
+.description-popup p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: #4a5568;
 }
+
+.actions-cell {
+  display: flex;
+  gap: 0.5rem;
+  white-space: nowrap;
+  justify-content: flex-end;
+  min-width: 120px;
+}
+
+.actions-cell button,
+.actions-cell a {
+  padding: 0.5rem;
+  border-radius: var(--radius);
+  color: #64748b;
+  transition: all var(--transition-normal);
+}
+
+.actions-cell button:hover,
+.actions-cell a:hover {
+  background: var(--bg-color);
+  color: var(--primary-color);
+}
+
+tr.deleting {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* ... адаптивные стили ... */
 </style>
