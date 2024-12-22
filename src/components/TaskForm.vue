@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import type { Task } from '@/types/task'
 
 const props = defineProps<{
   initialTask?: Partial<Task>
+  disabled?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -14,6 +15,20 @@ const title = ref(props.initialTask?.title ?? '')
 const description = ref(props.initialTask?.description ?? '')
 const status = ref(props.initialTask?.status ?? 'todo')
 const priority = ref(props.initialTask?.priority ?? 'medium')
+const tags = ref<string[]>(props.initialTask?.tags ?? [])
+const newTag = ref('')
+
+function addTag() {
+  const tag = newTag.value.trim()
+  if (tag && !tags.value.includes(tag)) {
+    tags.value.push(tag)
+    newTag.value = ''
+  }
+}
+
+function removeTag(tagToRemove: string) {
+  tags.value = tags.value.filter(tag => tag !== tagToRemove)
+}
 
 function handleSubmit() {
   emit('submit', {
@@ -21,166 +36,294 @@ function handleSubmit() {
     description: description.value,
     status: status.value as Task['status'],
     priority: priority.value as Task['priority'],
+    tags: tags.value
   })
+}
+
+const isSubmitDisabled = computed(() => {
+  return !title.value.trim() || !description.value.trim()
+})
+
+function handleTagKeydown(event: KeyboardEvent) {
+  if (event.key === 'Enter') {
+    event.preventDefault()
+    addTag()
+  }
 }
 </script>
 
 <template>
   <form @submit.prevent="handleSubmit" class="task-form">
     <div class="form-group">
-      <label for="title">Title</label>
-      <input id="title" v-model="title" type="text" required placeholder="Enter task title" />
+      <label for="title">
+        <i class="fas fa-heading"></i>
+        Title
+      </label>
+      <input
+        id="title"
+        v-model="title"
+        type="text"
+        required
+        placeholder="Enter task title"
+        :disabled="disabled"
+        class="form-control"
+      />
     </div>
 
     <div class="form-group">
-      <label for="description">Description</label>
+      <label for="description">
+        <i class="fas fa-align-left"></i>
+        Description
+      </label>
       <textarea
         id="description"
         v-model="description"
         required
         placeholder="Enter task description"
+        :disabled="disabled"
+        class="form-control"
       ></textarea>
+      <div class="description-footer">
+        <span class="hint">Supports markdown</span>
+        <span class="char-count" :class="{ 'near-limit': description.length > 900 }">
+          {{ description.length }}/1000
+        </span>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="status">
+          <i class="fas fa-tasks"></i>
+          Status
+        </label>
+        <select id="status" v-model="status" :disabled="disabled" class="form-control">
+          <option value="todo">To Do</option>
+          <option value="in-progress">In Progress</option>
+          <option value="done">Done</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="priority">
+          <i class="fas fa-flag"></i>
+          Priority
+        </label>
+        <select id="priority" v-model="priority" :disabled="disabled" class="form-control">
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+        </select>
+      </div>
     </div>
 
     <div class="form-group">
-      <label for="status">Status</label>
-      <select id="status" v-model="status">
-        <option value="todo">To Do</option>
-        <option value="in-progress">In Progress</option>
-        <option value="done">Done</option>
-      </select>
+      <label>
+        <i class="fas fa-tags"></i>
+        Tags
+      </label>
+      <div class="tags-input">
+        <div class="tags-list" :class="{ empty: !tags.length }">
+          <span v-for="tag in tags" :key="tag" class="tag">
+            {{ tag }}
+            <button
+              type="button"
+              class="remove-tag"
+              @click="removeTag(tag)"
+              :disabled="disabled"
+              title="Remove tag"
+            >
+              <i class="fas fa-times"></i>
+            </button>
+          </span>
+          <input
+            v-if="tags.length < 5"
+            type="text"
+            v-model="newTag"
+            placeholder="Add tag..."
+            @keydown="handleTagKeydown"
+            :disabled="disabled"
+            class="tag-input"
+          />
+        </div>
+        <div class="tags-footer">
+          <span class="hint">Press Enter to add tag</span>
+          <span class="tag-count">{{ tags.length }}/5</span>
+        </div>
+      </div>
     </div>
 
-    <div class="form-group">
-      <label for="priority">Priority</label>
-      <select id="priority" v-model="priority">
-        <option value="low">Low</option>
-        <option value="medium">Medium</option>
-        <option value="high">High</option>
-      </select>
+    <div class="form-actions">
+      <button type="submit" :disabled="disabled || isSubmitDisabled" class="submit-btn">
+        <i class="fas fa-save"></i>
+        {{ disabled ? 'Saving...' : 'Save Changes' }}
+      </button>
     </div>
-
-    <button type="submit">Save Task</button>
   </form>
 </template>
 
 <style scoped>
 .task-form {
-  background-color: var(--card-bg);
-  padding: 2rem;
+  background: white;
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  max-width: 600px;
-  margin: 0 auto;
-  animation: fadeIn 0.5s ease;
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
 }
 
-.form-group {
-  margin-bottom: 1.5rem;
-  animation: slideIn 0.3s ease;
-  animation-fill-mode: both;
+/* Базовые стили для всех групп */
+.form-group,
+.form-row,
+.form-actions {
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid var(--border-color);
 }
 
-.form-group:nth-child(1) {
-  animation-delay: 0.1s;
-}
-.form-group:nth-child(2) {
-  animation-delay: 0.2s;
-}
-.form-group:nth-child(3) {
-  animation-delay: 0.3s;
-}
-.form-group:nth-child(4) {
-  animation-delay: 0.4s;
+.form-group:last-of-type {
+  border-bottom: none;
 }
 
+/* Стили для строки с двумя колонками */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.form-row .form-group {
+  padding: 0;
+  border: none;
+}
+
+/* Стили для лейблов */
 label {
-  display: block;
-  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
   font-weight: 500;
-  color: var(--text-color);
+  color: #475569;
+  font-size: 0.9rem;
 }
 
-input,
-textarea,
-select {
+label i {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+/* Общие стили для всех полей ввода */
+.form-control {
   width: 100%;
-  padding: 0.75rem;
+  padding: 0.75rem 1rem;
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
-  font-size: 1rem;
+  font-size: 0.95rem;
   transition: all var(--transition-normal);
-  background: var(--card-bg);
-  position: relative;
-  overflow: hidden;
+  background: var(--bg-color);
+  margin-top: 0.75rem;
 }
 
-input:focus,
-textarea:focus,
-select:focus {
-  outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
-  transform: translateY(-2px);
-}
-
-textarea {
-  height: 120px;
+/* Специфичные стили для textarea */
+textarea.form-control {
+  min-height: 120px;
   resize: vertical;
+  line-height: 1.6;
 }
 
-button {
-  background-color: var(--primary-color);
-  color: white;
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: var(--radius);
-  font-size: 1rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all var(--transition-normal);
-  position: relative;
-  overflow: hidden;
-  width: 100%;
+/* Специфичные стили для select */
+select.form-control {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L2 4h8z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  padding-right: 2.5rem;
 }
 
-button::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  transition:
-    width 0.3s,
-    height 0.3s;
+/* Стили для нижней панели действий */
+.form-actions {
+  background: #f8fafc;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: flex-end;
+  margin-top: auto;
 }
 
-button:hover::after {
-  width: 300px;
-  height: 300px;
-}
-
-button:active {
-  transform: scale(0.98);
-}
-
-@media (min-width: 768px) {
-  button {
-    width: auto;
-  }
-}
+/* ... остальные стили ... */
 
 @media (max-width: 768px) {
-  .task-form {
-    padding: 1rem;
+  .form-group,
+  .form-row,
+  .form-actions {
+    padding: 1rem 1.5rem;
   }
 
-  button {
-    width: 100%;
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 1rem;
   }
+
+  .form-control {
+    font-size: 0.9rem;
+    padding: 0.6rem 0.75rem;
+  }
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  background: rgba(52, 152, 219, 0.1);
+  color: var(--primary-color);
+  border-radius: var(--radius-full);
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all var(--transition-normal);
+}
+
+.tag:hover {
+  background: rgba(52, 152, 219, 0.15);
+}
+
+.remove-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.1);
+  border: none;
+  border-radius: 50%;
+  color: #64748b;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.remove-tag:hover:not(:disabled) {
+  background: var(--danger-color);
+  color: white;
+  transform: scale(1.1);
+}
+
+.remove-tag:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.remove-tag i {
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  min-height: 48px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--bg-color);
 }
 </style>

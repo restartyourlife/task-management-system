@@ -1,7 +1,18 @@
 <script setup lang="ts">
 import { useAuthStore } from '@/stores/authStore'
+import { useRouter } from 'vue-router'
 
 const authStore = useAuthStore()
+const router = useRouter()
+
+const handleSignOut = async () => {
+  try {
+    await authStore.signOut()
+    router.push({ name: 'login' })
+  } catch (error) {
+    console.error('Error signing out:', error)
+  }
+}
 </script>
 
 <template>
@@ -12,7 +23,7 @@ const authStore = useAuthStore()
         :alt="authStore.user.user_metadata.full_name"
       />
       <span class="user-name">{{ authStore.user.user_metadata.full_name }}</span>
-      <button @click="authStore.signOut" :disabled="authStore.loading" class="sign-out-button">
+      <button @click="handleSignOut" :disabled="authStore.loading" class="sign-out-button">
         <span v-if="authStore.loading" class="loading-spinner"></span>
         <span v-else>Sign Out</span>
       </button>
@@ -22,22 +33,28 @@ const authStore = useAuthStore()
 
 <style scoped>
 .auth-button {
-  padding: 0.5rem 1rem;
-  background: var(--card-bg);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  height: 100%;
 }
 
 .user-info {
   display: flex;
   align-items: center;
   gap: 1rem;
+  padding: 0.5rem;
+  border-radius: var(--radius);
+  transition: var(--transition-normal);
+}
+
+.user-info:hover {
+  background: var(--bg-color);
 }
 
 .user-info img {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
   box-shadow: 0 0 0 2px var(--primary-color);
   transition: transform var(--transition-fast);
 }
@@ -49,30 +66,23 @@ const authStore = useAuthStore()
 .user-name {
   font-weight: 500;
   color: var(--text-color);
+  white-space: nowrap;
 }
 
 .sign-out-button {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
   padding: 0.5rem 1rem;
-  border: none;
   border-radius: var(--radius);
-  background: var(--danger-color);
-  color: white;
+  background: transparent;
+  color: var(--danger-color);
+  border: 1px solid var(--danger-color);
   font-weight: 500;
-  cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all var(--transition-normal);
 }
 
 .sign-out-button:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-}
-
-.sign-out-button:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
+  background: var(--danger-color);
+  color: white;
+  transform: translateY(-1px);
 }
 
 .loading-spinner {
@@ -88,6 +98,22 @@ const authStore = useAuthStore()
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 768px) {
+  .user-name {
+    display: none; /* Скрываем имя на мобильных устройствах */
+  }
+
+  .user-info {
+    padding: 0.25rem;
+    gap: 0.5rem;
+  }
+
+  .sign-out-button {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.9rem;
   }
 }
 </style>

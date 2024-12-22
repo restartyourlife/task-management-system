@@ -120,4 +120,74 @@ test.describe('Task Management System', () => {
     await expect(titleInput).toHaveAttribute('required', '')
     await expect(descriptionTextarea).toHaveAttribute('required', '')
   })
+
+  test('searches for tasks', async ({ page }) => {
+    // Создаем тестовые задачи
+    const tasks = [
+      { title: 'Search Test Task', description: 'Should be found' },
+      { title: 'Another Task', description: 'Should not be found' }
+    ]
+
+    // Создаем задачи
+    for (const task of tasks) {
+      await test.step(`Create task ${task.title}`, async () => {
+        await page.click('text=Create Task')
+        await page.fill('#title', task.title)
+        await page.fill('#description', task.description)
+        await page.click('button[type="submit"]')
+        await page.waitForURL('/')
+      })
+    }
+
+    // Выполняем поиск
+    await page.fill('.search-input', 'Search Test')
+
+    // Проверяем результаты
+    await expect(page.locator('.task-card')).toHaveCount(1)
+    await expect(page.locator('.task-card')).toContainText('Search Test Task')
+  })
+
+  test('filters tasks by tags', async ({ page }) => {
+    // Создаем задачу с тегами
+    await test.step('Create task with tags', async () => {
+      await page.click('text=Create Task')
+      await page.fill('#title', 'Task with Tags')
+      await page.fill('#description', 'Has important tag')
+      await page.fill('#tags', 'important,urgent')
+      await page.click('button[type="submit"]')
+      await page.waitForURL('/')
+    })
+
+    // Фильтруем по тегу
+    await page.click('.tag-button:has-text("important")')
+
+    // Проверяем результаты
+    await expect(page.locator('.task-card')).toContainText('Task with Tags')
+  })
+
+  test('sorts tasks', async ({ page }) => {
+    // Создаем несколько задач
+    const tasks = [
+      { title: 'A Task', priority: 'low' },
+      { title: 'B Task', priority: 'high' }
+    ]
+
+    for (const task of tasks) {
+      await test.step(`Create task ${task.title}`, async () => {
+        await page.click('text=Create Task')
+        await page.fill('#title', task.title)
+        await page.fill('#description', 'Test task')
+        await page.selectOption('#priority', task.priority)
+        await page.click('button[type="submit"]')
+        await page.waitForURL('/')
+      })
+    }
+
+    // Сортируем по приоритету
+    await page.click('.sort-button:has-text("Priority")')
+
+    // Проверяем порядок
+    const taskTitles = await page.locator('.task-card h3').allTextContents()
+    expect(taskTitles).toEqual(['B Task', 'A Task'])
+  })
 })
