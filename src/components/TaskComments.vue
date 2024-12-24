@@ -212,7 +212,7 @@ onMounted(loadComments)
         v-for="comment in comments"
         :key="comment.id"
         :comment="comment"
-        :can-edit="comment.userId === authStore.user?.id"
+        :can-edit="comment.user_id === authStore.user?.id"
         @update="updateComment"
         @delete="deleteComment"
       />

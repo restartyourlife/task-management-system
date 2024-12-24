@@ -53,16 +53,20 @@ function formatDate(date: Date): string {
   return new Date(date).toLocaleDateString()
 }
 
-console.log('Comment data:', props.comment)
-
 const formattedDate = computed(() => {
   try {
-    return formatDate(new Date(props.comment.created_at))
+    if (!props.comment.created_at) return ''
+
+    const date = new Date(props.comment.created_at)
+    if (isNaN(date.getTime())) return ''
+
+    return formatDate(date)
   } catch (e) {
     console.error('Error formatting date:', e)
     return ''
   }
 })
+
 </script>
 
 <template>
@@ -70,12 +74,12 @@ const formattedDate = computed(() => {
     <div class="comment-header">
       <div class="user-info">
         <img
-          :src="comment.userMetadata?.avatarUrl || ''"
-          :alt="comment.userMetadata?.fullName || 'User'"
+          :src="comment.author?.avatar_url || ''"
+          :alt="comment.author?.full_name || 'User'"
           class="avatar"
         />
         <div class="user-details">
-          <span class="username">{{ comment.userMetadata?.fullName || 'Anonymous' }}</span>
+          <span class="username">{{ comment.author?.full_name || 'Anonymous' }}</span>
           <time :datetime="comment.created_at">{{ formattedDate }}</time>
         </div>
       </div>

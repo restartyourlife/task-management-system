@@ -68,22 +68,26 @@
 import { computed } from 'vue'
 import { useTaskStore } from '@/stores/taskStore'
 import CustomSelect from './CustomSelect.vue'
+import type { Task } from '@/types/task'
 
 const taskStore = useTaskStore()
 
-const statusOptions = [
-  { value: '', label: 'All Statuses' },
+type Status = Task['status'] | null
+type Priority = Task['priority'] | null
+
+const statusOptions: Array<{ value: Status, label: string }> = [
+  { value: null, label: 'All Statuses' },
   { value: 'todo', label: 'To Do' },
   { value: 'in-progress', label: 'In Progress' },
   { value: 'done', label: 'Done' }
-]
+] as const
 
-const priorityOptions = [
-  { value: '', label: 'All Priorities' },
+const priorityOptions: Array<{ value: Priority, label: string }> = [
+  { value: null, label: 'All Priorities' },
   { value: 'low', label: 'Low' },
   { value: 'medium', label: 'Medium' },
   { value: 'high', label: 'High' }
-]
+] as const
 
 const hasActiveFilters = computed(() => {
   return taskStore.filters.search ||
@@ -94,8 +98,8 @@ const hasActiveFilters = computed(() => {
 
 function clearFilters() {
   taskStore.filters.search = ''
-  taskStore.filters.status = undefined
-  taskStore.filters.priority = undefined
+  taskStore.filters.status = null
+  taskStore.filters.priority = null
   taskStore.filters.tags = []
 }
 

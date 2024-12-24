@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useTaskStore } from '@/stores/taskStore'
 import TaskForm from '@/components/TaskForm.vue'
 import type { Task } from '@/types/task'
+import { supabase } from '@/config/supabase'
 
 const router = useRouter()
 const route = useRoute()
@@ -11,14 +12,55 @@ const taskStore = useTaskStore()
 const isLoading = ref(false)
 const error = ref<string | null>(null)
 
-const taskId = route.params.id as string
-const task = computed(() => taskStore.tasks.find((t) => t.id === taskId))
+const taskId = computed(() => route.params.id as string)
+const task = ref<Task | null>(null)
 
-async function handleSubmit(taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) {
+// Загрузка задачи
+async function loadTask() {
   try {
+    if (!taskId.value) {
+      throw new Error('Task ID is required')
+    }
+
+    isLoading.value = true
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('id', taskId.value)
+      .single()
+
+    if (error) throw error
+    if (!data) throw new Error('Task not found')
+
+    task.value = data
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Failed to load task'
+    router.push({ name: 'tasks' })
+  } finally {
+    isLoading.value = false
+  }
+}
+
+async function handleSubmit(taskData: Partial<Task>) {
+  try {
+    if (!taskId.value || !task.value) {
+      throw new Error('Task ID is required')
+    }
+
     isLoading.value = true
     error.value = null
-    await taskStore.updateTask(taskId, taskData)
+
+    // Убираем поля, которые не нужно обновлять
+    const updateData = {
+      title: taskData.title,
+      description: taskData.description,
+      status: taskData.status,
+      priority: taskData.priority,
+      tags: taskData.tags,
+      workspace_id: taskData.workspace_id
+    }
+
+    await taskStore.updateTask(taskId.value, updateData)
     router.push({ name: 'tasks' })
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Failed to update task'
@@ -31,24 +73,25 @@ function handleCancel() {
   router.push({ name: 'tasks' })
 }
 
-// Если задача не найдена, перенаправляем на список задач
-if (!task.value) {
-  router.push({ name: 'tasks' })
-}
-
 // Добавим отслеживание скролла
 const isScrolled = ref(false)
 
-onMounted(() => {
-  const handleScroll = () => {
-    isScrolled.value = window.scrollY > 0
-  }
-  window.addEventListener('scroll', handleScroll)
-  handleScroll() // Проверяем начальное состояние
+function formatDate(dateString: string): string {
+  return new Date(dateString).toLocaleString()
+}
 
-  onUnmounted(() => {
-    window.removeEventListener('scroll', handleScroll)
-  })
+function handleScroll() {
+  isScrolled.value = window.scrollY > 0
+}
+
+onMounted(async () => {
+  await loadTask() // Загружаем задачу при монтировании
+  window.addEventListener('scroll', handleScroll)
+  handleScroll()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleScroll)
 })
 </script>
 
@@ -79,11 +122,11 @@ onMounted(() => {
           <h3>Task Information</h3>
           <div class="info-item">
             <span class="label">Created</span>
-            <span class="value">{{ new Date(task.createdAt).toLocaleString() }}</span>
+            <span class="value">{{ formatDate(task.created_at) }}</span>
           </div>
           <div class="info-item">
             <span class="label">Updated</span>
-            <span class="value">{{ new Date(task.updatedAt).toLocaleString() }}</span>
+            <span class="value">{{ formatDate(task.updated_at) }}</span>
           </div>
         </div>
 

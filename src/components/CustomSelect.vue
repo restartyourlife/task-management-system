@@ -1,18 +1,44 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import type { Workspace } from '@/types/task'
 
-const { modelValue, options } = defineProps<{
-  modelValue: string | undefined
-  options: { value: string; label: string }[]
+interface SelectOption<T> {
+  value: T
+  label: string
+}
+
+type SelectValue = string | Workspace | null
+
+const props = defineProps<{
+  modelValue: SelectValue
+  options: SelectOption<SelectValue>[]
+  disabled?: boolean
 }>()
 
 const emit = defineEmits<{
-  'update:modelValue': [value: string]
+  'update:modelValue': [value: Workspace | null | string]
 }>()
 
 const isOpen = ref(false)
 
-function selectOption(value: string) {
+const selectedOption = computed(() =>
+  props.options.find(opt => {
+    if (typeof opt.value === 'object' && opt.value !== null) {
+      return typeof props.modelValue === 'object' && props.modelValue !== null &&
+             opt.value.id === props.modelValue.id
+    }
+    return opt.value === props.modelValue
+  })
+)
+
+function getOptionKey(value: SelectValue): string {
+  if (typeof value === 'object' && value !== null) {
+    return value.id
+  }
+  return String(value)
+}
+
+function selectOption(value: Workspace | null | string) {
   emit('update:modelValue', value)
   isOpen.value = false
 }
@@ -20,17 +46,21 @@ function selectOption(value: string) {
 
 <template>
   <div class="custom-select" :class="{ open: isOpen }">
-    <div class="select-header" @click="isOpen = !isOpen">
-      <span>{{ options.find(opt => opt.value === modelValue)?.label || 'Select...' }}</span>
+    <div
+      class="select-header"
+      @click="!disabled && (isOpen = !isOpen)"
+      :class="{ disabled }"
+    >
+      <span>{{ selectedOption?.label || 'Select...' }}</span>
       <i class="fas fa-chevron-down"></i>
     </div>
     <Transition name="select">
       <div v-if="isOpen" class="options-list">
         <div
           v-for="option in options"
-          :key="option.value"
+          :key="getOptionKey(option.value)"
           class="option"
-          :class="{ active: option.value === modelValue }"
+          :class="{ active: option === selectedOption }"
           @click="selectOption(option.value)"
         >
           {{ option.label }}

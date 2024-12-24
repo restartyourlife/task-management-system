@@ -43,7 +43,11 @@ function handleSubmit() {
     description: description.value.slice(0, MAX_DESCRIPTION_LENGTH),
     status: status.value as Task['status'],
     priority: priority.value as Task['priority'],
-    tags: tags.value
+    tags: tags.value,
+    workspace_id: '',
+    user_id: '',
+    created_at: new Date().toLocaleString(),
+    updated_at: new Date().toLocaleString()
   })
 }
 

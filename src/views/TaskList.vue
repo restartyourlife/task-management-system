@@ -1,18 +1,23 @@
 <script setup lang="ts">
 import { useTaskStore } from '@/stores/taskStore'
 import { RouterLink } from 'vue-router'
-import { onMounted, ref, onUnmounted, reactive } from 'vue'
+import { onMounted, ref, onUnmounted, reactive, nextTick } from 'vue'
 import LoadingOverlay from '@/components/LoadingOverlay.vue'
 import TaskFilters from '@/components/TaskFilters.vue'
 import TaskSort from '@/components/TaskSort.vue'
 import TaskComments from '@/components/TaskComments.vue'
+import WorkspaceSelector from '@/components/WorkspaceSelector.vue'
+import CreateWorkspace from '@/components/CreateWorkspace.vue'
 
 const taskStore = useTaskStore()
 const activeCommentTaskId = ref<string | null>(null)
 const expandedDescriptions = reactive<Record<string, boolean>>({})
+const showCreateWorkspace = ref(false)
 
 onMounted(() => {
+  taskStore.fetchWorkspaces()
   taskStore.fetchTasks()
+  document.addEventListener('click', handleClickOutside)
 })
 
 function toggleComments(taskId: string) {
@@ -25,17 +30,89 @@ function toggleComments(taskId: string) {
   }
 }
 
-function toggleDescription(taskId: string) {
-  expandedDescriptions[taskId] = !expandedDescriptions[taskId]
+function closeAllPopups() {
+  Object.keys(expandedDescriptions).forEach(key => {
+    expandedDescriptions[key] = false
+  })
+}
+
+function toggleDescription(taskId: string, event: MouseEvent) {
+  event.stopPropagation()
+
+  const wasOpen = expandedDescriptions[taskId]
+  closeAllPopups()
+  expandedDescriptions[taskId] = !wasOpen
+
+  if (expandedDescriptions[taskId]) {
+    nextTick(() => {
+      const button = event.currentTarget as HTMLElement
+      const rect = button.getBoundingClientRect()
+      const popup = document.querySelector('.description-popup') as HTMLElement
+
+      if (popup) {
+        const viewportHeight = window.innerHeight
+        const viewportWidth = window.innerWidth
+
+        let top = rect.bottom + 10
+        let left = rect.left
+
+        if (top + popup.offsetHeight > viewportHeight) {
+          top = rect.top - popup.offsetHeight - 10
+        }
+
+        if (left + popup.offsetWidth > viewportWidth) {
+          left = viewportWidth - popup.offsetWidth - 20
+        }
+
+        popup.style.top = `${top}px`
+        popup.style.left = `${left}px`
+      }
+    })
+  }
+}
+
+// Изменяем обработчик клика вне popup
+function handleClickOutside(event: MouseEvent) {
+  const popup = document.querySelector('.description-popup')
+  const buttons = document.querySelectorAll('.show-description-btn')
+  const table = document.querySelector('.tasks-table')
+
+  // Если клик был внутри таблицы, не закрываем popup
+  if (table?.contains(event.target as Node)) {
+    return
+  }
+
+  if (popup && !popup.contains(event.target as Node)) {
+    let clickedOnButton = false
+    buttons.forEach(button => {
+      if (button.contains(event.target as Node)) {
+        clickedOnButton = true
+      }
+    })
+
+    if (!clickedOnButton) {
+      Object.keys(expandedDescriptions).forEach(key => {
+        expandedDescriptions[key] = false
+      })
+    }
+  }
 }
 
 onUnmounted(() => {
   document.body.classList.remove('modal-open')
+  document.removeEventListener('click', handleClickOutside)
 })
 </script>
 
 <template>
   <div class="task-list">
+    <div class="workspace-header">
+      <WorkspaceSelector />
+      <button class="create-workspace-btn" @click="showCreateWorkspace = true">
+        <i class="fas fa-plus"></i>
+        New Workspace
+      </button>
+    </div>
     <LoadingOverlay :show="taskStore.loading">
       <template v-if="taskStore.loading">
         {{ taskStore.loadingMessage || 'Loading tasks...' }}
@@ -72,16 +149,20 @@ onUnmounted(() => {
                   <button
                     v-if="task.description"
                     class="show-description-btn"
-                    @click="toggleDescription(task.id)"
+                    @click="toggleDescription(task.id, $event)"
                   >
                     <i class="fas fa-align-left"></i>
                     Description
                   </button>
                   <div
-                    v-if="expandedDescriptions[task.id]"
-                    class="description-popup"
-                  >
-                    <p>{{ task.description }}</p>
+                    v-if="Object.values(expandedDescriptions).some(Boolean)"
+                    class="popup-overlay"
+                    @click="closeAllPopups"
+                  ></div>
+                  <div class="description-popup" v-if="expandedDescriptions[task.id]">
+                    <div class="popup-content">
+                      <p>{{ task.description }}</p>
+                    </div>
                   </div>
                 </td>
                 <td>
@@ -139,6 +220,30 @@ onUnmounted(() => {
         </div>
       </Transition>
     </Teleport>
+
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="showCreateWorkspace" class="modal-wrapper">
+          <div class="modal-overlay" @click="showCreateWorkspace = false"></div>
+          <div class="modal-container">
+            <div class="modal-header">
+              <h3>Create Workspace</h3>
+              <button class="close-button" @click="showCreateWorkspace = false">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+            <div class="modal-content">
+              <CreateWorkspace @created="showCreateWorkspace = false" />
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <RouterLink to="/tasks/create" class="create-button">
+      <i class="fas fa-plus"></i>
+      <span class="tooltip">Create Task</span>
+    </RouterLink>
   </div>
 </template>
 
@@ -618,19 +723,21 @@ onUnmounted(() => {
   position: fixed;
   bottom: 2rem;
   right: 2rem;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
   background-color: var(--success-color);
   color: white;
-  padding: 1rem;
-  border-radius: 50%;
-  text-decoration: none;
-  box-shadow: var(--shadow-lg);
-  transition: all var(--transition-normal);
-  z-index: 45;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 60px;
-  height: 60px;
+  box-shadow: var(--shadow-lg);
+  transition: all var(--transition-normal);
+  z-index: 50;
+}
+
+.create-button i {
+  font-size: 1.5rem;
 }
 
 .create-button:hover {
@@ -638,41 +745,32 @@ onUnmounted(() => {
   background-color: #27ae60;
 }
 
-.create-button .button-content {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.create-button i {
-  font-size: 1.5rem;
-}
-
-.create-button .button-text {
-  display: none;
-}
-
-.create-button:hover::before {
-  content: 'Create Task';
+.create-button .tooltip {
   position: absolute;
-  right: 100%;
+  right: calc(100% + 1rem);
   top: 50%;
   transform: translateY(-50%);
   background: rgba(0, 0, 0, 0.8);
   color: white;
   padding: 0.5rem 1rem;
   border-radius: var(--radius);
-  margin-right: 1rem;
   font-size: 0.9rem;
   white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: all var(--transition-normal);
+}
+
+.create-button:hover .tooltip {
+  opacity: 1;
 }
 
 @media (max-width: 768px) {
   .create-button {
     bottom: 1.5rem;
     right: 1.5rem;
-    width: 50px;
-    height: 50px;
+    width: 48px;
+    height: 48px;
   }
 
   .create-button i {
@@ -849,12 +947,10 @@ onUnmounted(() => {
   white-space: pre-line;
   max-width: 100%;
   transition: all 0.3s ease;
-}
-
-.description:not(.is-expanded) {
-  display: block; /* Убираем -webkit-box */
-  max-height: 4.8em; /* Примерно 3 строки */
-  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
 }
 
 .show-more-btn {
@@ -895,10 +991,11 @@ onUnmounted(() => {
 }
 
 .tasks-table {
+  position: relative; /* Добавляем для правильного позиционирования */
   background: white;
   border-radius: var(--radius);
   border: 1px solid var(--border-color);
-  overflow: hidden;
+  overflow: visible; /* Меняем с hidden на visible */
   width: 100%;
 }
 
@@ -942,6 +1039,11 @@ th {
 .title-cell {
   position: relative;
   min-width: 250px;
+  z-index: 5;
+}
+
+.title-cell:hover {
+  z-index: 15;
 }
 
 .title-cell h3 {
@@ -970,25 +1072,33 @@ th {
 }
 
 .description-popup {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  width: 300px;
-  padding: 1rem;
+  position: fixed;
+  z-index: 1000;
   background: white;
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  z-index: 10;
-  margin-top: 0.5rem;
+  box-shadow: var(--shadow-lg);
+  width: 300px;
+  height: 200px;
+  pointer-events: auto;
 }
 
-.description-popup p {
+.popup-content {
+  height: calc(100% - 2rem);
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+.popup-content p {
   margin: 0;
   font-size: 0.9rem;
   line-height: 1.6;
   color: #4a5568;
+  white-space: pre-line;
+  word-wrap: break-word;
 }
+
+/* Удаляем стрелку, так как она может создавать проблемы с позиционированием */
 
 .actions-cell {
   display: flex;
@@ -1018,4 +1128,57 @@ tr.deleting {
 }
 
 /* ... адаптивные стили ... */
+
+.popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: transparent;
+  z-index: 999;
+}
+
+.description-popup {
+  position: fixed;
+  z-index: 1000;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  width: 300px;
+  height: 200px;
+}
+
+.popup-content {
+  height: calc(100% - 2rem);
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+.workspace-header {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+}
+
+.create-workspace-btn {
+  padding: 0.75rem 1.5rem;
+  height: 51.59px; /* Добавлена фиксированная высота */
+  background: var(--primary-color);
+  color: white;
+  border-radius: var(--radius);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all var(--transition-normal);
+  white-space: nowrap; /* Предотвращает перенос текста */
+}
+
+.create-workspace-btn:hover {
+  background: #2980b9;
+  transform: translateY(-1px);
+}
 </style>

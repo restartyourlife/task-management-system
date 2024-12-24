@@ -201,3 +201,42 @@ a {
     opacity: 1;
   }
 }
+
+/* Глобальные стили для скроллбара */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary-color) transparent;
+}
+
+/* Стили для WebKit (Chrome, Safari, новые версии Edge) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--primary-color);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #2980b9;
+}
+
+/* Стили для углов скроллбара */
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Стили для Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary-color) transparent;
+}
